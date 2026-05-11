@@ -1,0 +1,132 @@
+from urllib.request import urlopen
+from urllib.parse import urlsplit
+import httpx
+from fastapi import HTTPException
+from typing import Literal
+from pydantic import BaseModel
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import ipaddress
+import socket
+import re
+
+
+def download_text_file(url: str, encoding: str = "utf-8", timeout: float = 15.0) -> str:
+	with urlopen(url, timeout=timeout) as response:
+		data = response.read()
+	return data.decode(encoding)
+
+
+def extract_proxy_target(line: str) -> tuple[str, int, str] | None:
+  candidate = line.strip()
+  if not candidate:
+    return None
+
+  parsed = urlsplit(candidate)
+  if parsed.netloc:
+    try:
+      if parsed.hostname is None or parsed.port is None:
+        return None
+      return parsed.hostname, parsed.port, parsed.netloc
+    except ValueError:
+      return None
+
+  return None
+
+
+def filter_unique(lines: list[str]) -> list[str]:
+  unique_lines_step_1: list[str] = []
+  unique_lines_step_2: list[str] = []
+  seen_authorities: set[str] = set()
+  seen_logins: set[str] = set()
+  not_resolved: set[str] = set()
+  resolved: set[str] = set()
+
+  for line in lines:
+    target = extract_proxy_target(line)
+    if target is None:
+      continue
+    hostname, _, authority = target
+    if authority in seen_authorities:
+      continue
+    seen_authorities.add(authority)
+    login, *_ = authority.split("@")
+    if login in seen_logins and not is_ip_address(hostname):
+      not_resolved.add(hostname)
+    seen_logins.add(login)  
+    unique_lines_step_1.append(line)
+
+  with ThreadPoolExecutor(max_workers=10) as executor:
+    futures = {executor.submit(socket.gethostbyname, hostname): hostname for hostname in not_resolved}
+    for future in as_completed(futures):
+      hostname = futures[future]
+      try:
+        if future.result() not in resolved:
+          resolved.add(future.result())
+        print(f"Resolved {hostname} to {future.result()}")
+      except Exception:
+        pass
+
+  for line in unique_lines_step_1:
+    target = extract_proxy_target(line)
+    hostname, _, authority = target
+    if is_ip_address(hostname) and hostname in resolved:
+      continue
+    unique_lines_step_2.append(re.sub(r"%20t\.me%2Frjsxrd|\s+t\.me/rjsxrd", "", line))
+
+  return unique_lines_step_2
+
+
+def is_valid_source_url(url: str) -> bool:
+  parsed = urlsplit(url.strip())
+  return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def is_ip_address(host: str) -> bool:
+  try:
+    ipaddress.ip_address(host)
+    return True
+  except ValueError:
+    return False
+  
+class ProxyItem(BaseModel):
+    index: int
+    stableId: str
+    name: str
+    subName: str
+    server: str
+    port: int
+    protocol: Literal["vless", "trojan", "ss", "vmess", "hysteria", "hysteria2"]
+    proxyPort: int
+    online: bool
+    latencyMs: int
+
+
+class ProxiesResponse(BaseModel):
+    success: bool
+    data: list[ProxyItem]
+
+
+async def get_validated_proxies() -> list[ProxyItem]:
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get("http://192.168.4.3:2112/api/v1/proxies")
+        response.raise_for_status()
+        data = ProxiesResponse.model_validate(response.json())
+        if not data.success:
+            raise HTTPException(
+                status_code=502,
+                detail="External API returned unsuccessful response",
+            )
+        return data.data
+           
+    except httpx.HTTPStatusError as error:
+        raise HTTPException(
+            status_code=error.response.status_code,
+            detail="External API returned an error",
+        )
+
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=502,
+            detail="Cannot connect to external API",
+        )
