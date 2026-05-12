@@ -37,9 +37,9 @@ def filter_unique(lines: list[str]) -> list[str]:
   unique_lines_step_1: list[str] = []
   unique_lines_step_2: list[str] = []
   seen_authorities: set[str] = set()
-  seen_logins: set[str] = set()
   not_resolved: set[str] = set()
-  resolved: set[str] = set()
+  resolved: dict[str, str] = {}
+  resolved_ips: set[str] = set()
 
   for line in lines:
     target = extract_proxy_target(line)
@@ -49,10 +49,8 @@ def filter_unique(lines: list[str]) -> list[str]:
     if authority in seen_authorities:
       continue
     seen_authorities.add(authority)
-    login, *_ = authority.split("@")
-    if login in seen_logins and not is_ip_address(hostname):
+    if not is_ip_address(hostname) :
       not_resolved.add(hostname)
-    seen_logins.add(login)  
     unique_lines_step_1.append(line)
 
   with ThreadPoolExecutor(max_workers=10) as executor:
@@ -61,7 +59,8 @@ def filter_unique(lines: list[str]) -> list[str]:
       hostname = futures[future]
       try:
         if future.result() not in resolved:
-          resolved.add(future.result())
+          resolved[hostname] = future.result()
+          resolved_ips.add(future.result())
         print(f"Resolved {hostname} to {future.result()}")
       except Exception:
         pass
@@ -69,8 +68,13 @@ def filter_unique(lines: list[str]) -> list[str]:
   for line in unique_lines_step_1:
     target = extract_proxy_target(line)
     hostname, _, authority = target
-    if is_ip_address(hostname) and hostname in resolved:
+    if "extra=" in line and not re.search(r"extra=\{.+\}|extra=null", line):
       continue
+    if is_ip_address(hostname):
+      if hostname in resolved_ips:
+        continue
+    else:
+       line = line.replace(f"@{hostname}", f"@{resolved[hostname]}") if hostname in resolved else line
     unique_lines_step_2.append(re.sub(r"%20t\.me%2Frjsxrd|\s+t\.me/rjsxrd", "", line))
 
   return unique_lines_step_2
@@ -109,7 +113,7 @@ class ProxiesResponse(BaseModel):
 async def get_validated_proxies() -> list[ProxyItem]:
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get("http://192.168.4.3:2112/api/v1/proxies")
+            response = await client.get("http://192.168.4.1:2112/api/v1/proxies")
         response.raise_for_status()
         data = ProxiesResponse.model_validate(response.json())
         if not data.success:
