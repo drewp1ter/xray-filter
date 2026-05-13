@@ -46,7 +46,7 @@ def filter_unique(lines: list[str]) -> list[str]:
     if target is None:
       continue
     hostname, _, authority = target
-    if authority in seen_authorities:
+    if authority in seen_authorities or hostname == '0.0.0.0':
       continue
     seen_authorities.add(authority)
     if not is_ip_address(hostname) :
@@ -58,7 +58,7 @@ def filter_unique(lines: list[str]) -> list[str]:
     for future in as_completed(futures):
       hostname = futures[future]
       try:
-        if future.result() not in resolved:
+        if future.result() not in resolved and future.result() != '0.0.0.0':
           resolved[hostname] = future.result()
           resolved_ips.add(future.result())
         print(f"Resolved {hostname} to {future.result()}")
