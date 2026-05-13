@@ -103,6 +103,7 @@ class ProxyItem(BaseModel):
     proxyPort: int
     online: bool
     latencyMs: int
+    originalData: str
 
 
 class ProxiesResponse(BaseModel):

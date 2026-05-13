@@ -1,16 +1,17 @@
 import os
 import re
-from fastapi import APIRouter, HTTPException, Response
+import base64
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
+from urllib.parse import unquote
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.utils.utils import download_text_file, filter_unique, is_valid_source_url, get_validated_proxies
 
 router = APIRouter()
-proxies = []
+
 
 @router.get("/proxies", response_class=PlainTextResponse)
 def get_proxies():
-    global proxies
     lists = os.getenv("PROXY_LISTS", "")
     if not lists:
         raise HTTPException(status_code=500, detail="No proxy list URLs configured")
@@ -41,12 +42,7 @@ def get_proxies_count():
 
 
 @router.get("/proxies/online", response_class=PlainTextResponse)
-async def get_online_proxies():
-    global proxies
-    
-    if not proxies:
-        raise HTTPException(status_code=404, detail="No proxies available to check")
-
-    validated_proxies = await get_validated_proxies()
-    online_proxies = [proxies[p.index] for p in validated_proxies if p.online]
+async def get_online_proxies():    
+    validated_proxies = sorted(await get_validated_proxies(), key=lambda p: p.latencyMs if p.latencyMs > 0 else float('inf'))
+    online_proxies = [f"**{p.latencyMs}ms** | `{unquote(p.name)}`\n```\n{base64.b64decode(p.originalData).decode('utf-8')}\n```\n" for p in validated_proxies if p.online and p.latencyMs < 10000]
     return "\n".join(online_proxies)
