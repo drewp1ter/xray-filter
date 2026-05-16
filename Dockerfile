@@ -33,6 +33,7 @@ RUN if [ "${ENVIRONMENT}" = "prod" ]; then \
 
 RUN groupadd -r runner
 RUN useradd -r -g runner -m -s /usr/sbin/nologin runner
+RUN mkdir -p /app/db
 RUN chown -R runner:root /app
 RUN chmod -R g=u /app
 

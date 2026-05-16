@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from typing import Literal
 from pydantic import BaseModel
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from app.constants import XRAY_CHECKER_URL
 import ipaddress
 import socket
 import re
@@ -114,7 +115,7 @@ class ProxiesResponse(BaseModel):
 async def get_validated_proxies() -> list[ProxyItem]:
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get("http://192.168.4.1:2112/api/v1/proxies")
+            response = await client.get(XRAY_CHECKER_URL + "/api/v1/proxies")
         response.raise_for_status()
         data = ProxiesResponse.model_validate(response.json())
         if not data.success:
