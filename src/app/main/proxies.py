@@ -1,6 +1,7 @@
 import os
 import re
 import base64
+from datetime import datetime, UTC
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from uptime_kuma_api import MonitorType, UptimeKumaApi
@@ -96,3 +97,36 @@ async def get_online_proxies():
     connection.commit()
     connection.close()
     return "\n".join(online_proxies)
+
+@router.get("/proxies/from_kuma", response_class=PlainTextResponse)
+async def get_online_proxies_from_kuma():
+    validated_proxies = sorted(await get_validated_proxies(), key=lambda p: p.latencyMs if p.latencyMs > 0 else float('inf'))
+    online_proxies = []
+    connection = get_connection()
+    cursor = connection.cursor()
+    with UptimeKumaApi(KUMA_URL) as kuma:
+        try:
+            kuma.login(KUMA_LOGIN, KUMA_PASSWORD)
+            monitors = kuma.get_monitors()    
+            uptimes = kuma.uptime()
+            kuma.disconnect()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to login to Uptime Kuma: {exc}")    
+    for proxy in validated_proxies:
+        if not proxy.online or proxy.latencyMs >= 10000:
+            continue
+        decodedURL = base64.b64decode(proxy.originalData).decode('utf-8')
+        _, _, authority = extract_proxy_target(decodedURL)
+        cursor.execute("SELECT created_at FROM seen_online WHERE authority = ?", (authority,))
+        created_at_row = cursor.fetchone()
+        created_at = created_at_row["created_at"] if created_at_row else None
+        if created_at is None:
+            cursor.execute("INSERT INTO seen_online (name, authority, url) VALUES (?, ?, ?)", (proxy.name, authority, decodedURL))
+            created_at = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+        monitor = next((m for m in monitors if proxy.stableId in m['url']), None)
+        if monitor:
+            uptime_info = uptimes[monitor['id']]
+            uptime = uptime_info[720] 
+        online_proxies.append({ "name": proxy.name, "url": decodedURL, "latency": proxy.latencyMs, "created_at": created_at, "uptime": uptime if monitor else 1 })
+    online_proxies = sorted(online_proxies, key=lambda p: (p["uptime"], -datetime.strptime(p["created_at"], "%Y-%m-%d %H:%M:%S").timestamp()), reverse=True)
+    return "\n".join([f"**{p['latency']}ms** | `{p['name']}`\n`добавлен: {p['created_at']} | аптайм: {int(p['uptime']*100)}%`\n```\n{p['url']}\n```\n" for p in online_proxies]) 
