@@ -5,7 +5,8 @@ from fastapi import HTTPException
 from typing import Literal
 from pydantic import BaseModel
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from app.constants import XRAY_CHECKER_URL
+from uptime_kuma_api import UptimeKumaApi
+from app.constants import XRAY_CHECKER_URL, KUMA_URL, KUMA_LOGIN, KUMA_PASSWORD
 import ipaddress
 import socket
 import re
@@ -100,7 +101,7 @@ class ProxyItem(BaseModel):
     subName: str
     server: str
     port: int
-    protocol: Literal["vless", "trojan", "ss", "vmess", "hysteria", "hysteria2"]
+    protocol: Literal["vless", "trojan", "ss", "shadowsocks", "vmess", "hysteria", "hysteria2"]
     proxyPort: int
     online: bool
     latencyMs: int
@@ -136,3 +137,29 @@ async def get_validated_proxies() -> list[ProxyItem]:
             status_code=502,
             detail="Cannot connect to external API",
         )
+    
+
+def kuma_pause_all_monitors() -> bool:
+   with UptimeKumaApi(KUMA_URL) as kuma:
+      try:
+          kuma.login(KUMA_LOGIN, KUMA_PASSWORD)
+      except Exception as exc:
+          print(f"Failed to login to Uptime Kuma: {exc}")
+          return False
+      monitors = kuma.get_monitors()
+      with ThreadPoolExecutor(max_workers=4) as executor:
+          executor.submit(lambda: [kuma.pause_monitor(monitor["id"]) for monitor in monitors])
+      return True
+   
+
+def kuma_resume_all_monitors() -> bool:
+   with UptimeKumaApi(KUMA_URL) as kuma:
+      try:
+          kuma.login(KUMA_LOGIN, KUMA_PASSWORD)
+      except Exception as exc:
+          print(f"Failed to login to Uptime Kuma: {exc}")
+          return False
+      monitors = kuma.get_monitors()
+      with ThreadPoolExecutor(max_workers=4) as executor:
+          executor.submit(lambda: [kuma.resume_monitor(monitor["id"]) for monitor in monitors])
+      return True

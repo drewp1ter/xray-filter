@@ -396,7 +396,7 @@ dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "httpx" },
     { name = "pydantic" },
-    { name = "uptime-kuma-api" },
+    { name = "uptime-kuma-api-v2" },
     { name = "uvicorn" },
 ]
 
@@ -406,7 +406,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.136.1" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pydantic", specifier = ">=2.13.4" },
-    { name = "uptime-kuma-api", specifier = ">=1.2.1" },
+    { name = "uptime-kuma-api-v2", specifier = ">=1.0.1" },
     { name = "uvicorn", specifier = ">=0.46.0" },
 ]
 
@@ -766,14 +766,17 @@ wheels = [
 ]
 
 [[package]]
-name = "uptime-kuma-api"
-version = "1.2.1"
+name = "uptime-kuma-api-v2"
+version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
     { name = "python-socketio", extra = ["client"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/40/01/da3e682364231077b05417ffa32e11ef84deee2b6f4dd6ee740cf097df28/uptime_kuma_api-1.2.1.tar.gz", hash = "sha256:b59e659f7b32e96e512dcc23ccb6e1a1b08d2db1d72215c8ceb70e5421be67e1", size = 43631, upload-time = "2023-09-26T20:33:37.567Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/59/a7ec763e75e33bca9018ec009024300efaaa73801e2f05da51fd5c903768/uptime_kuma_api_v2-1.0.1.tar.gz", hash = "sha256:843849a0b552c6bb36ebfb83abd0924878bff310bab04a8e536df5f26b3283ba", size = 52194, upload-time = "2026-02-14T00:39:46.232Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/65/14/02cced1b44cc03ee3e0eb5023a91c7eab1939be6e32703c4d9d4b627e383/uptime_kuma_api_v2-1.0.1-py3-none-any.whl", hash = "sha256:7fb5a971b93dee3562df81822b572d1c869c29a6f3765fd058aeb55e04b32bb4", size = 46698, upload-time = "2026-02-14T00:39:45.055Z" },
+]
 
 [[package]]
 name = "urllib3"

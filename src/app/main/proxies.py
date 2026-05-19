@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse
 from uptime_kuma_api import MonitorType, UptimeKumaApi
 from urllib.parse import unquote
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from app.utils.utils import download_text_file, filter_unique, is_valid_source_url, get_validated_proxies, extract_proxy_target
+from app.utils.utils import download_text_file, filter_unique, is_valid_source_url, get_validated_proxies, extract_proxy_target, kuma_pause_all_monitors
 from app.constants import KUMA_URL, KUMA_LOGIN, KUMA_PASSWORD, XRAY_CHECKER_URL
 from app.db import get_connection
 
@@ -26,6 +26,7 @@ def get_proxies(
     if not urls:
         raise HTTPException(status_code=500, detail="No valid proxy list URLs configured")
 
+    kuma_pause_all_monitors()
     connection = get_connection()
     cursor = connection.cursor()
     cursor.execute("SELECT url FROM seen_online")
@@ -40,19 +41,12 @@ def get_proxies(
                 proxy_lines.extend(future.result().splitlines())
             except Exception as exc:
                 raise HTTPException(status_code=500, detail=f"Failed to download proxy list from {url}: {exc}")
-
-    proxies = filter_unique(sorted(proxy_lines, key=lambda line: line.strip().lower()))
+    proxies = filter_unique(proxy_lines)
         
     if filter_type == "hiddify":
         proxies = [line for line in proxies if 'xtls-rprx-vision-udp443' not in line]
 
     return PlainTextResponse(content="\n".join(proxies), media_type="text/plain", headers={"profile-update-interval": "24"})
-
-
-@router.get("/proxies/count")
-def get_proxies_count():
-    global proxies
-    return {"count": len(proxies)}
 
 
 @router.get("/proxies/online", response_class=PlainTextResponse)
@@ -85,7 +79,7 @@ async def get_online_proxies():
                             url=f"{XRAY_CHECKER_URL}/config/{proxy.stableId}",
                             interval=1800,
                             maxretries=3,
-                            retryInterval=60,
+                            retryInterval=600,
                             description=decodedURL
                         )
                     except Exception as exc:
