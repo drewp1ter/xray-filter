@@ -12,14 +12,15 @@ async def send_telegram_message(message: str):
     cursor = connection.cursor()
 
     for chunk in split_telegram_markdown(message):
-        print("Sending message chunk:")
-        print(chunk)
-        message = await bot.send_message(
-            chat_id=CHANNEL_ID,
-            parse_mode="Markdown",
-            text=chunk
-        )
-        cursor.execute("INSERT INTO sent_messages (message_id, message_text) VALUES (?, ?)", (message.message_id, chunk))
+        try:
+            message = await bot.send_message(
+                chat_id=CHANNEL_ID,
+                parse_mode="Markdown",
+                text=chunk
+            )
+            cursor.execute("INSERT INTO sent_messages (message_id, message_text) VALUES (?, ?)", (message.message_id, chunk))
+        except Exception as e:
+            print(f"Failed to send message chunk: {e}")
     
     connection.commit()
     connection.close()

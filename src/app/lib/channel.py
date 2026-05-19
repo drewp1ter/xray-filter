@@ -19,7 +19,7 @@ async def make_post():
     connection = get_connection()
     cursor = connection.cursor()
     created_at_list = cursor.execute(
-        "SELECT stable_id, created_at FROM seen_online WHERE stable_id IN ({seq})"
+        "SELECT stable_id, datetime(created_at, '+3 hours') AS created_at FROM seen_online WHERE stable_id IN ({seq})"
         .format(seq=','.join(['?']*len(online_proxies))), 
         [proxy.stableId for proxy in online_proxies]
     ).fetchall()
@@ -31,8 +31,8 @@ async def make_post():
         created_at = next((row["created_at"] for row in created_at_list if row["stable_id"] == proxy.stableId), None)
         online_proxies_data.append({ "name": proxy.name, "url": decodedURL, "latency": proxy.latencyMs, "created_at": created_at, "uptime": uptime_stats.get(proxy.stableId, 100) })
     
-    online_proxies_data = sorted(online_proxies_data, key=lambda p: (p["uptime"], -datetime.strptime(p["created_at"], "%Y-%m-%d %H:%M:%S").timestamp()), reverse=True)
-    message = "\n".join([f"**{p['latency']}ms** | `{p['name']}`\n`добавлен: {p['created_at']} | аптайм: {p['uptime']}%`\n```\n{p['url']}\n```\n" for p in online_proxies_data])
+    online_proxies_data = sorted(online_proxies_data, key=lambda p: (p["uptime"], -datetime.strptime(p["created_at"], "%Y-%m-%d %H:%M:%S").timestamp(), -p["latency"]), reverse=True)
+    message = "\n".join([f"**{p['latency']}ms** | `{p['name']}`\n`добавлен: {p['created_at']} | аптайм: {p['uptime'] if p['uptime'] > 0 else 100}%`\n```\n{p['url']}\n```\n" for p in online_proxies_data])
     
     if len(online_proxies_data) > 0:
         await cleanup_telegram_messages()
@@ -40,5 +40,9 @@ async def make_post():
     
 
 def can_make_new_post(cooldown_seconds: int) -> bool:
+    now_hour = datetime.now().hour
+    if now_hour < 9 or now_hour >= 21:
+        return False
+
     age = get_last_sent_message_age_in_seconds()
     return age is None or age >= cooldown_seconds
