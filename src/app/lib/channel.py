@@ -33,9 +33,10 @@ async def make_post():
     
     online_proxies_data = sorted(online_proxies_data, key=lambda p: (p["uptime"], -datetime.strptime(p["created_at"], "%Y-%m-%d %H:%M:%S").timestamp()), reverse=True)
     message = "\n".join([f"**{p['latency']}ms** | `{p['name']}`\n`добавлен: {p['created_at']} | аптайм: {p['uptime']}%`\n```\n{p['url']}\n```\n" for p in online_proxies_data])
-
-    await cleanup_telegram_messages()
-    await send_telegram_message(message)
+    
+    if len(online_proxies_data) > 0:
+        await cleanup_telegram_messages()
+        await send_telegram_message(message)
     
 
 def can_make_new_post(cooldown_seconds: int) -> bool:
