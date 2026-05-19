@@ -1,5 +1,0 @@
-DATABASE_FILE = "db/database.db"
-KUMA_URL = "http://192.168.4.1:3001"
-KUMA_LOGIN = "iddqd"
-KUMA_PASSWORD = "wY16DRcV"
-XRAY_CHECKER_URL = "http://192.168.4.1:2112"

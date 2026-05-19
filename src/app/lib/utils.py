@@ -1,12 +1,13 @@
 from urllib.request import urlopen
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, unquote
 import httpx
 from fastapi import HTTPException
 from typing import Literal
 from pydantic import BaseModel
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from uptime_kuma_api import UptimeKumaApi
-from app.constants import XRAY_CHECKER_URL, KUMA_URL, KUMA_LOGIN, KUMA_PASSWORD
+from app.lib.db import get_connection
+from app.lib.constants import XRAY_CHECKER_URL
+import base64
 import ipaddress
 import socket
 import re
@@ -138,28 +139,27 @@ async def get_validated_proxies() -> list[ProxyItem]:
             detail="Cannot connect to external API",
         )
     
+    
+async def update_seen_online_proxies(proxies: list[ProxyItem]):    
+    connection = get_connection()
+    cursor = connection.cursor()
+    for proxy in proxies:
+        if not proxy.online:
+            continue
+        cursor.execute("SELECT 1 FROM seen_online WHERE stable_id = ?", (proxy.stableId,))
+        if cursor.fetchone() is None:
+            decodedURL = base64.b64decode(proxy.originalData).decode('utf-8')
+            cursor.execute("INSERT INTO seen_online (name, stable_id, url) VALUES (?, ?, ?)", (proxy.name, proxy.stableId, decodedURL))    
+        else:
+            cursor.execute("UPDATE seen_online SET last_seen = CURRENT_TIMESTAMP WHERE stable_id = ?", (proxy.stableId,))       
+    connection.commit()
+    connection.close()
 
-def kuma_pause_all_monitors() -> bool:
-   with UptimeKumaApi(KUMA_URL) as kuma:
-      try:
-          kuma.login(KUMA_LOGIN, KUMA_PASSWORD)
-      except Exception as exc:
-          print(f"Failed to login to Uptime Kuma: {exc}")
-          return False
-      monitors = kuma.get_monitors()
-      with ThreadPoolExecutor(max_workers=4) as executor:
-          executor.submit(lambda: [kuma.pause_monitor(monitor["id"]) for monitor in monitors])
-      return True
-   
 
-def kuma_resume_all_monitors() -> bool:
-   with UptimeKumaApi(KUMA_URL) as kuma:
-      try:
-          kuma.login(KUMA_LOGIN, KUMA_PASSWORD)
-      except Exception as exc:
-          print(f"Failed to login to Uptime Kuma: {exc}")
-          return False
-      monitors = kuma.get_monitors()
-      with ThreadPoolExecutor(max_workers=4) as executor:
-          executor.submit(lambda: [kuma.resume_monitor(monitor["id"]) for monitor in monitors])
-      return True
+def get_seen_online_proxies() -> list[str]:
+    connection = get_connection()
+    cursor = connection.cursor()
+    cursor.execute("SELECT url FROM seen_online")
+    proxy_lines: list[str] = [row["url"] for row in cursor.fetchall()]
+    connection.close()
+    return proxy_lines

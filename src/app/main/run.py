@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from app.db import init_database
+from app.lib.db import init_database
 from .proxies import router as proxies_router, get_online_proxies
 
 scheduler = AsyncIOScheduler()
