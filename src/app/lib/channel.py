@@ -1,6 +1,6 @@
 
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.lib.utils import get_validated_proxies, update_seen_online_proxies
 from app.lib.tg import get_last_sent_message_age_in_seconds, send_telegram_message, cleanup_telegram_messages
 from app.lib.db import get_connection
@@ -9,12 +9,15 @@ from app.lib.constants import MAKE_POST_INTERVAL_SECONDS
 
 async def make_post():    
     online_proxies = [proxy for proxy in await get_validated_proxies() if proxy.online]
+    print(f"Found {len(online_proxies)} online proxies.")
     await update_seen_online_proxies(online_proxies)
 
     if not can_make_new_post(MAKE_POST_INTERVAL_SECONDS):
+        print("Cooldown active. Skipping post.")
         return
 
     uptime_stats = await fetch_uptime_stats()
+    print(f"Fetched uptime stats for {len(uptime_stats)} proxies.")
     online_proxies_data = []
     connection = get_connection()
     cursor = connection.cursor()
@@ -32,15 +35,17 @@ async def make_post():
         online_proxies_data.append({ "name": proxy.name, "url": decodedURL, "latency": proxy.latencyMs, "created_at": created_at, "uptime": uptime_stats.get(proxy.stableId, 100) })
     
     online_proxies_data = sorted(online_proxies_data, key=lambda p: (p["uptime"], -datetime.strptime(p["created_at"], "%Y-%m-%d %H:%M:%S").timestamp(), -p["latency"]), reverse=True)
-    message = "\n".join([f"**{p['latency']}ms** | `{p['name']}`\n`добавлен: {p['created_at']} | аптайм: {p['uptime'] if p['uptime'] > 0 else 100}%`\n```\n{p['url']}\n```\n" for p in online_proxies_data])
     
     if len(online_proxies_data) > 0:
+        message = "\n".join([f"**{p['latency']}ms** | `{p['name']}`\n`добавлен: {p['created_at']} | аптайм: {p['uptime'] if p['uptime'] > 0 else 100}%`\n```\n{p['url']}\n```\n" for p in online_proxies_data])
         await cleanup_telegram_messages()
         await send_telegram_message(message)
+    else:
+        print("No online proxies to post.")    
     
 
 def can_make_new_post(cooldown_seconds: int) -> bool:
-    now_hour = datetime.now().hour
+    now_hour = (datetime.now() + timedelta(hours=3)).hour
     if now_hour < 9 or now_hour >= 21:
         return False
 
