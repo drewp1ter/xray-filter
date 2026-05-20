@@ -24,16 +24,13 @@ def extract_proxy_target(line: str) -> tuple[str, int, str] | None:
   if not candidate:
     return None
 
-  parsed = urlsplit(candidate)
-  if parsed.netloc:
-    try:
-      if parsed.hostname is None or parsed.port is None:
-        return None
-      return parsed.hostname, parsed.port, parsed.netloc
-    except ValueError:
+  try:
+    parsed = urlsplit(candidate)
+    if parsed.netloc and (parsed.hostname is None or parsed.port is None):
       return None
-
-  return None
+    return parsed.hostname, parsed.port, parsed.netloc
+  except:
+    return None
 
 
 def filter_unique(lines: list[str]) -> list[str]:
