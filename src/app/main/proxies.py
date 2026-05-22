@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse
 from urllib.parse import unquote
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.lib.utils import download_text_file, filter_unique, is_valid_source_url, get_validated_proxies, extract_proxy_target, get_seen_online_proxies, update_seen_online_proxies
-from app.lib.constants import PROMETHEUS_PUSHGATEWAY_URL
+from app.lib.constants import PROMETHEUS_PUSHGATEWAY_URL, TG_PROXY
 from app.lib.db import get_connection
 from app.lib.channel import make_post
 import httpx
@@ -29,7 +29,7 @@ def get_proxies(
 
     proxy_lines: list[str] = get_seen_online_proxies()
     with ThreadPoolExecutor(max_workers=min(4, len(urls))) as executor:
-        futures = {executor.submit(download_text_file, url): url for url in urls}
+        futures = {executor.submit(download_text_file, url, proxy=TG_PROXY): url for url in urls}
         for future in as_completed(futures):
             url = futures[future]
             try:
@@ -76,5 +76,6 @@ async def push_metrics(body: str = Body(..., media_type="text/plain")):
     
     asyncio.create_task(make_post())
     return {"status": "success", "message": "Metrics pushed successfully"}
+
 
 

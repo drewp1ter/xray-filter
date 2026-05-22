@@ -1,4 +1,4 @@
-from urllib.request import urlopen
+from urllib.request import urlopen, ProxyHandler, build_opener
 from urllib.parse import urlsplit, unquote
 import httpx
 from fastapi import HTTPException
@@ -13,10 +13,17 @@ import socket
 import re
 
 
-def download_text_file(url: str, encoding: str = "utf-8", timeout: float = 15.0) -> str:
-	with urlopen(url, timeout=timeout) as response:
-		data = response.read()
-	return data.decode(encoding)
+def download_text_file(url: str, encoding: str = "utf-8", timeout: float = 15.0, proxy: str | None = None) -> str:
+  if proxy:
+    parsed_url = urlsplit(url)
+    proxy_scheme = parsed_url.scheme or "http"
+    opener = build_opener(ProxyHandler({proxy_scheme: proxy}))
+    with opener.open(url, timeout=timeout) as response:
+      data = response.read()
+  else:
+    with urlopen(url, timeout=timeout) as response:
+      data = response.read()
+  return data.decode(encoding)
 
 
 def extract_proxy_target(line: str) -> tuple[str, int, str] | None:

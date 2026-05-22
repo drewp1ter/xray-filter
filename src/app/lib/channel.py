@@ -30,25 +30,26 @@ async def make_post():
     connection.close()
         
     for proxy in online_proxies:
-        decodedURL = base64.b64decode(proxy.originalData).decode('utf-8')
+        decoded_url = base64.b64decode(proxy.originalData).decode('utf-8')
+        print(decoded_url)
         created_at = next((row["created_at"] for row in created_at_list if row["stable_id"] == proxy.stableId), None)
-        online_proxies_data.append({ "name": proxy.name, "url": decodedURL, "latency": proxy.latencyMs, "created_at": created_at, "uptime": uptime_stats.get(proxy.stableId, 100) })
+        online_proxies_data.append({ "name": proxy.name, "decoded_url": decoded_url, "latency": proxy.latencyMs, "created_at": created_at, "uptime": uptime_stats.get(proxy.stableId, 100) })
     
-    online_proxies_data = sorted(online_proxies_data, key=lambda p: (p["uptime"], -datetime.strptime(p["created_at"], "%Y-%m-%d %H:%M:%S").timestamp(), -p["latency"]), reverse=True)
+    # online_proxies_data = sorted(online_proxies_data, key=lambda p: (p["uptime"], -datetime.strptime(p["created_at"], "%Y-%m-%d %H:%M:%S").timestamp(), -p["latency"]), reverse=True)
     
     if len(online_proxies_data) > 0:
-        message = "\n".join([f"**{p['latency']}ms** | `{p['name']}`\n`добавлен: {p['created_at']} | аптайм: {p['uptime'] if p['uptime'] > 0 else 100}%`\n```\n{p['url']}\n```\n" for p in online_proxies_data])
-        await cleanup_telegram_messages()
+        message = "\n".join([f"**{p['latency']}ms** | `{p['name']}`\n`добавлен: {p['created_at']} | аптайм: {p['uptime'] if p['uptime'] > 0 else 100}%`\n```\n{p['decoded_url']}\n```\n" for p in online_proxies_data])
+        # await cleanup_telegram_messages()
         await send_telegram_message(message)
         print(f"Posted {len(online_proxies_data)} proxies to Telegram.")
     else:
         print("No online proxies to post. Cleaning up old messages.")
-        await cleanup_telegram_messages()    
+        # await cleanup_telegram_messages()    
     
 
 def can_make_new_post(cooldown_seconds: int) -> bool:
     now_hour = (datetime.now() + timedelta(hours=3)).hour
-    if now_hour < 9 or now_hour >= 21:
+    if now_hour < 8 or now_hour >= 22:
         return False
 
     age = get_last_sent_message_age_in_seconds()
