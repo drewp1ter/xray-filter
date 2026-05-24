@@ -37,9 +37,10 @@ async def cleanup_telegram_messages():
     for message in messages:
         try:
             await bot.delete_message(chat_id=CHANNEL_ID, message_id=message["message_id"])
-            cursor.execute("UPDATE sent_messages SET deleted_at = CURRENT_TIMESTAMP WHERE message_id = ?", (message["message_id"],))
         except Exception as e:
             print(f"Failed to delete message {message['message_id']}: {e}")
+        finally:
+            cursor.execute("UPDATE sent_messages SET deleted_at = CURRENT_TIMESTAMP WHERE message_id = ?", (message["message_id"],))
     connection.commit()
     connection.close()
     await bot.session.close()

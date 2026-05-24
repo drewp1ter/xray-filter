@@ -1,14 +1,11 @@
 import os
 import re
-import base64
 import asyncio
 from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import PlainTextResponse
-from urllib.parse import unquote
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from app.lib.utils import download_text_file, filter_unique, is_valid_source_url, get_validated_proxies, extract_proxy_target, get_seen_online_proxies, update_seen_online_proxies
+from app.lib.utils import download_text_file, filter_unique, is_valid_source_url, get_seen_online_proxies
 from app.lib.constants import PROMETHEUS_PUSHGATEWAY_URL, TG_PROXY
-from app.lib.db import get_connection
 from app.lib.channel import make_post
 import httpx
 
@@ -44,28 +41,6 @@ def get_proxies(
     return PlainTextResponse(content="\n".join(proxies), media_type="text/plain", headers={"profile-update-interval": "24"})
 
 
-@router.get("/proxies/online", response_class=PlainTextResponse)
-async def get_online_proxies():    
-    validated_proxies = sorted(await get_validated_proxies(), key=lambda p: p.latencyMs if p.latencyMs > 0 else float('inf'))
-    online_proxies = []
-    connection = get_connection()
-    cursor = connection.cursor()
-    for proxy in validated_proxies:
-        if not proxy.online or proxy.latencyMs >= 10000:
-            continue
-        decodedURL = base64.b64decode(proxy.originalData).decode('utf-8')
-        online_proxies.append(f"**{proxy.latencyMs}ms** | `{unquote(proxy.name)}`\n```\n{decodedURL}\n```\n")
-        _, _, authority = extract_proxy_target(decodedURL)
-        cursor.execute("SELECT 1 FROM seen_online WHERE authority = ?", (authority,))
-        if cursor.fetchone() is None:
-            cursor.execute("INSERT INTO seen_online (name, authority, url) VALUES (?, ?, ?)", (proxy.name, authority, decodedURL))    
-        else:
-            cursor.execute("UPDATE seen_online SET last_seen = CURRENT_TIMESTAMP WHERE authority = ?", (authority,))       
-    connection.commit()
-    connection.close()
-    return "\n".join(online_proxies)
-
-
 @router.post("/metrics/push")
 async def push_metrics(body: str = Body(..., media_type="text/plain")):
     try:
@@ -76,6 +51,3 @@ async def push_metrics(body: str = Body(..., media_type="text/plain")):
     
     asyncio.create_task(make_post())
     return {"status": "success", "message": "Metrics pushed successfully"}
-
-
-
