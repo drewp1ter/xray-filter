@@ -39,17 +39,17 @@ async def make_post():
     
     if len(online_proxies_data) > 0:
         message = "\n".join([f"**{p['latency']}ms** | `{p['name']}`\n`добавлен: {p['created_at']} | аптайм: {p['uptime'] if p['uptime'] > 0 else 100}%`\n```\n{p['decoded_url']}\n```\n" for p in online_proxies_data])
-        # await cleanup_telegram_messages()
+        await cleanup_telegram_messages()
         await send_telegram_message(message)
         print(f"Posted {len(online_proxies_data)} proxies to Telegram.")
     else:
         print("No online proxies to post. Cleaning up old messages.")
-        # await cleanup_telegram_messages()    
+        await cleanup_telegram_messages()    
     
 
 def can_make_new_post(cooldown_seconds: int) -> bool:
     now_hour = (datetime.now() + timedelta(hours=3)).hour
-    if now_hour < 8 or now_hour >= 22:
+    if now_hour < 6 or now_hour >= 22:
         return False
 
     age = get_last_sent_message_age_in_seconds()
