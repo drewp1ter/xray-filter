@@ -53,7 +53,7 @@ async def make_post():
 
 def can_make_new_post(cooldown_seconds: int) -> bool:
     now_hour = (datetime.now() + timedelta(hours=3)).hour
-    if now_hour < 6 or now_hour >= 23:
+    if now_hour < 6:
         return False
 
     age = get_last_sent_message_age_in_seconds()
