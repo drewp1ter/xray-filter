@@ -7,7 +7,7 @@ from app.lib.db import get_connection
 from app.lib.prometheus import fetch_uptime_stats
 from app.lib.constants import MAKE_POST_INTERVAL_SECONDS
 
-MAX_LATENCY_MS = 10000
+MAX_LATENCY_MS = 20000
 
 async def make_post():    
     online_proxies = [proxy for proxy in await get_validated_proxies() if proxy.online]

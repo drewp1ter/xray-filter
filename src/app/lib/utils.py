@@ -53,7 +53,7 @@ def filter_unique(lines: list[str]) -> list[str]:
     if target is None:
       continue
     hostname, _, authority = target
-    if authority in seen_authorities or hostname == '0.0.0.0':
+    if authority in seen_authorities or hostname == '0.0.0.0' or 'pqv=' in line:
       continue
     seen_authorities.add(authority)
     if not is_ip_address(hostname) :
