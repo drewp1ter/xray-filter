@@ -26,6 +26,14 @@ def download_text_file(url: str, encoding: str = "utf-8", timeout: float = 15.0,
   return data.decode(encoding)
 
 
+def read_proxy_list_from_file(file_path: str, encoding: str = "utf-8") -> list[str]:
+  try:
+    with open(file_path, "r", encoding=encoding) as file:
+      return [line.strip() for line in file if line.strip()]
+  except:
+    return []  
+
+
 def extract_proxy_target(line: str) -> tuple[str, int, str] | None:
   candidate = line.strip()
   if not candidate:
@@ -163,7 +171,24 @@ async def update_seen_online_proxies(proxies: list[ProxyItem]):
 def get_seen_online_proxies() -> list[str]:
     connection = get_connection()
     cursor = connection.cursor()
-    cursor.execute("SELECT url FROM seen_online")
+    cursor.execute("SELECT url FROM seen_online WHERE datetime(last_seen) >= datetime('now', '-7 days')")
     proxy_lines: list[str] = [row["url"] for row in cursor.fetchall()]
     connection.close()
     return proxy_lines
+
+def numerate_non_unique_proxies_names(proxies: list[str]) -> list[str]:
+    name_counts: dict[str, int] = {}
+    result: list[str] = []
+    for line in proxies:
+        parsed = urlsplit(line.strip())
+        if parsed.fragment is None:
+            result.append(line)
+            continue
+        
+        name = unquote(parsed.fragment)
+        count = name_counts.get(name, 0) + 1
+        name_counts[name] = count
+        if count > 1:
+            line = line.replace(f"#{parsed.fragment}", f"#{count}_{parsed.fragment}")
+        result.append(line)
+    return result
