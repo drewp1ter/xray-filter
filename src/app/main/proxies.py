@@ -5,7 +5,7 @@ import base64
 from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from app.lib.utils import download_text_file, filter_unique, is_valid_source_url, get_seen_online_proxies, read_proxy_list_from_file, numerate_non_unique_proxies_names, get_validated_proxies
+from app.lib.utils import download_text_file, filter_unique, is_valid_source_url, get_seen_online_proxies, read_proxy_list_from_file, numerate_non_unique_proxies_names, get_validated_proxies, get_wl_is_active
 from app.lib.constants import PROMETHEUS_PUSHGATEWAY_URL, TG_PROXY
 from app.lib.channel import make_post
 import httpx
@@ -63,6 +63,7 @@ async def push_metrics(body: str = Body(..., media_type="text/plain")):
 
 @router.get("/proxies/online", response_class=PlainTextResponse)
 async def get_online_proxies():    
+    wl_is_active = await get_wl_is_active()
     validated_proxies = sorted(await get_validated_proxies(), key=lambda p: p.latencyMs if p.latencyMs > 0 else float('inf'))
     online_proxies = []
     for proxy in validated_proxies:
@@ -70,7 +71,7 @@ async def get_online_proxies():
             continue
         decodedURL = base64.b64decode(proxy.originalData).decode('utf-8')
         online_proxies.append(decodedURL)
-    sub = "#profile-title: WhiteList\n" + \
+    sub = f"#profile-title: VPNClub | WL: {'ON' if wl_is_active else 'OFF'}\n" + \
           "#profile-locked: false\n" + \
           "#profile-update-interval: 1\n"
     global last_seen_online_proxies, locked

@@ -121,9 +121,21 @@ class ProxyItem(BaseModel):
     originalData: str
 
 
+class Status(BaseModel):
+    total: int
+    online: int
+    offline: int
+    avgLatencyMs: int
+    connectionStatus: Literal["WL", "OK", "Initializing", "No internet"]
+
 class ProxiesResponse(BaseModel):
     success: bool
     data: list[ProxyItem]
+
+
+class StatusResponse(BaseModel):
+    success: bool
+    data: Status
 
 
 async def get_validated_proxies() -> list[ProxyItem]:
@@ -150,7 +162,23 @@ async def get_validated_proxies() -> list[ProxyItem]:
             status_code=502,
             detail="Cannot connect to external API",
         )
-    
+
+
+async def get_wl_is_active() -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(XRAY_CHECKER_URL + "/api/v1/status")
+        response.raise_for_status()
+        data = StatusResponse.model_validate(response.json())
+        if not data.success:
+            raise HTTPException(
+                status_code=502,
+                detail="External API returned unsuccessful response",
+            )
+        return data.data.connectionStatus == "WL"
+    except:
+        return False
+
     
 async def update_seen_online_proxies(proxies: list[ProxyItem]):    
     connection = get_connection()
