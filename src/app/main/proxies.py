@@ -12,6 +12,8 @@ import httpx
 
 router = APIRouter()
 
+last_wl_online_proxies: list[str] = []
+
 @router.get("/proxies", response_class=PlainTextResponse, )
 def get_proxies(
     filter_type: str | None = Query(default=None, pattern="^(hiddify)$")
@@ -39,8 +41,6 @@ def get_proxies(
         
     if filter_type == "hiddify":
         proxies = [line for line in proxies if 'xtls-rprx-vision-udp443' not in line]
-    global locked
-    locked = True
     return PlainTextResponse(content="\n".join(proxies), media_type="text/plain", headers={"profile-update-interval": "24"})
 
 
@@ -53,8 +53,6 @@ async def push_metrics(body: str = Body(..., media_type="text/plain")):
         raise HTTPException(status_code=500, detail=f"Failed to push metrics to Prometheus Pushgateway: {exc}")
     
     asyncio.create_task(make_post())
-    global locked
-    locked = False
     return {"status": "success", "message": "Metrics pushed successfully"}
 
 
@@ -66,5 +64,8 @@ async def get_online_proxies():
     sub = f"#profile-title: VPNClub | WL: {'ON' if wl_is_active else 'OFF'}\n" + \
           "#profile-locked: false\n" + \
           "#profile-update-interval: 1\n"
-    sub += "\n" + "\n".join(proxy_lines)
+    global last_wl_online_proxies
+    if wl_is_active:
+        last_wl_online_proxies = proxy_lines
+    sub += "\n" + "\n".join(proxy_lines if len(proxy_lines) > 0 else last_wl_online_proxies)
     return sub
