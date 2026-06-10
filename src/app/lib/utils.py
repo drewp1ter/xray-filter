@@ -196,10 +196,10 @@ async def update_seen_online_proxies(proxies: list[ProxyItem]):
     connection.close()
 
 
-def get_seen_online_proxies() -> list[str]:
+def get_seen_online_proxies(period: str) -> list[str]:
     connection = get_connection()
     cursor = connection.cursor()
-    cursor.execute("SELECT url FROM seen_online WHERE datetime(last_seen) >= datetime('now', '-7 days')")
+    cursor.execute(f"SELECT url FROM seen_online WHERE datetime(last_seen) >= datetime('now', '-{period}') ORDER BY last_seen DESC")
     proxy_lines: list[str] = [row["url"] for row in cursor.fetchall()]
     connection.close()
     return proxy_lines

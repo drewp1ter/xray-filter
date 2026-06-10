@@ -12,9 +12,6 @@ import httpx
 
 router = APIRouter()
 
-last_seen_online_proxies: list[str] = []
-locked = False
-
 @router.get("/proxies", response_class=PlainTextResponse, )
 def get_proxies(
     filter_type: str | None = Query(default=None, pattern="^(hiddify)$")
@@ -27,7 +24,7 @@ def get_proxies(
     if not urls:
         raise HTTPException(status_code=500, detail="No valid proxy list URLs configured")
 
-    proxy_lines: list[str] = get_seen_online_proxies()
+    proxy_lines: list[str] = get_seen_online_proxies('7 days')
     proxy_lines.extend(read_proxy_list_from_file("/usr/share/subs.txt"))
     with ThreadPoolExecutor(max_workers=min(4, len(urls))) as executor:
         futures = {executor.submit(download_text_file, url, proxy=TG_PROXY): url for url in urls}
@@ -64,18 +61,10 @@ async def push_metrics(body: str = Body(..., media_type="text/plain")):
 @router.get("/proxies/online", response_class=PlainTextResponse)
 async def get_online_proxies():    
     wl_is_active = await get_wl_is_active()
-    validated_proxies = sorted(await get_validated_proxies(), key=lambda p: p.latencyMs if p.latencyMs > 0 else float('inf'))
-    online_proxies = []
-    for proxy in validated_proxies:
-        if not proxy.online:
-            continue
-        decodedURL = base64.b64decode(proxy.originalData).decode('utf-8')
-        online_proxies.append(decodedURL)
+    proxy_lines: list[str] = get_seen_online_proxies('1 hour')
+
     sub = f"#profile-title: VPNClub | WL: {'ON' if wl_is_active else 'OFF'}\n" + \
           "#profile-locked: false\n" + \
           "#profile-update-interval: 1\n"
-    global last_seen_online_proxies, locked
-    if (len(online_proxies) > 0 and not locked) or len(last_seen_online_proxies) == 0:
-        last_seen_online_proxies = online_proxies
-    sub += "\n" + "\n".join(last_seen_online_proxies)
+    sub += "\n" + "\n".join(proxy_lines)
     return sub
