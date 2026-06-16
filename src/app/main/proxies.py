@@ -5,7 +5,7 @@ import base64
 from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from app.lib.utils import download_text_file, filter_unique, is_valid_source_url, get_seen_online_proxies, read_proxy_list_from_file, numerate_non_unique_proxies_names, get_validated_proxies, get_wl_is_active
+from app.lib.utils import download_text_file, filter_unique, is_valid_source_url, get_seen_online_proxies, read_list_from_file, numerate_non_unique_proxies_names, get_validated_proxies, get_wl_is_active
 from app.lib.constants import PROMETHEUS_PUSHGATEWAY_URL, TG_PROXY
 from app.lib.channel import make_post
 import httpx
@@ -27,7 +27,7 @@ def get_proxies(
         raise HTTPException(status_code=500, detail="No valid proxy list URLs configured")
 
     proxy_lines: list[str] = get_seen_online_proxies('7 days')
-    proxy_lines.extend(read_proxy_list_from_file("/usr/share/subs.txt"))
+    proxy_lines.extend(read_list_from_file("/usr/share/subs.txt"))
     with ThreadPoolExecutor(max_workers=min(4, len(urls))) as executor:
         futures = {executor.submit(download_text_file, url, proxy=TG_PROXY): url for url in urls}
         for future in as_completed(futures):
@@ -65,7 +65,8 @@ async def get_online_proxies():
           "#profile-locked: false\n" + \
           "#profile-update-interval: 1\n"
     global last_wl_online_proxies
-    if wl_is_active:
+    if wl_is_active and len(proxy_lines) > 0:
         last_wl_online_proxies = proxy_lines
-    sub += "\n" + "\n".join(proxy_lines if len(proxy_lines) > 0 else last_wl_online_proxies)
-    return sub
+    print(f"{len(proxy_lines)} online proxies, {len(last_wl_online_proxies)} is saved, WL is {'active' if wl_is_active else 'inactive'}")
+    sub += "\n" + "\n".join(last_wl_online_proxies)
+    return PlainTextResponse(content=base64.b64encode(sub.encode("utf-8")).decode(), media_type="text/plain")

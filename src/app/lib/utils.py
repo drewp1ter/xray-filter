@@ -1,5 +1,5 @@
 from urllib.request import urlopen, ProxyHandler, build_opener
-from urllib.parse import urlsplit, unquote
+from urllib.parse import urlsplit, unquote, parse_qs
 import httpx
 from fastapi import HTTPException
 from typing import Literal
@@ -26,15 +26,15 @@ def download_text_file(url: str, encoding: str = "utf-8", timeout: float = 15.0,
   return data.decode(encoding)
 
 
-def read_proxy_list_from_file(file_path: str, encoding: str = "utf-8") -> list[str]:
+def read_list_from_file(file_path: str, encoding: str = "utf-8") -> list[str]:
   try:
     with open(file_path, "r", encoding=encoding) as file:
       return [line.strip() for line in file if line.strip()]
   except:
-    return []  
+    return []   
 
 
-def extract_proxy_target(line: str) -> tuple[str, int, str] | None:
+def extract_proxy_target(line: str) -> tuple[str, int, str, dict[str, list[str]]] | None:
   candidate = line.strip()
   if not candidate:
     return None
@@ -43,7 +43,7 @@ def extract_proxy_target(line: str) -> tuple[str, int, str] | None:
     parsed = urlsplit(candidate)
     if parsed.netloc and (parsed.hostname is None or parsed.port is None):
       return None
-    return parsed.hostname, parsed.port, parsed.netloc
+    return parsed.hostname, parsed.port, parsed.netloc, parse_qs(parsed.query)
   except:
     return None
 
@@ -55,14 +55,18 @@ def filter_unique(lines: list[str]) -> list[str]:
   not_resolved: set[str] = set()
   resolved: dict[str, str] = {}
   resolved_ips: set[str] = set()
+  strings_to_skip = read_list_from_file("/usr/share/skip.txt")
 
   for line in lines:
+    if any(skip_string in line for skip_string in strings_to_skip):
+      continue
     target = extract_proxy_target(line)
     if target is None:
       continue
-    hostname, _, authority = target
-    if authority in seen_authorities or hostname == '0.0.0.0' or 'pqv=' in line:
+    hostname, _, authority, _ = target
+    if authority in seen_authorities or hostname == '0.0.0.0' in line:
       continue
+
     seen_authorities.add(authority)
     if not is_ip_address(hostname) :
       not_resolved.add(hostname)
@@ -82,7 +86,7 @@ def filter_unique(lines: list[str]) -> list[str]:
 
   for line in unique_lines_step_1:
     target = extract_proxy_target(line)
-    hostname, _, authority = target
+    hostname, _, authority, _ = target
     if "extra=" in line and not re.search(r"extra=\{.+\}|extra=null", line):
       continue
     if is_ip_address(hostname):
