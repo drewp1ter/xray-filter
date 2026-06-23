@@ -55,7 +55,7 @@ def filter_unique(lines: list[str]) -> list[str]:
   not_resolved: set[str] = set()
   resolved: dict[str, str] = {}
   resolved_ips: set[str] = set()
-  strings_to_skip = read_list_from_file("/usr/share/skip.txt")
+  strings_to_skip = read_list_from_file("/usr/share/xray/skip.txt")
 
   for line in lines:
     if any(skip_string in line for skip_string in strings_to_skip):

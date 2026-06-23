@@ -27,7 +27,7 @@ def get_proxies(
         raise HTTPException(status_code=500, detail="No valid proxy list URLs configured")
 
     proxy_lines: list[str] = get_seen_online_proxies('7 days')
-    proxy_lines.extend(read_list_from_file("/usr/share/subs.txt"))
+    proxy_lines.extend(read_list_from_file("/usr/share/xray/subs.txt"))
     with ThreadPoolExecutor(max_workers=min(4, len(urls))) as executor:
         futures = {executor.submit(download_text_file, url, proxy=TG_PROXY): url for url in urls}
         for future in as_completed(futures):
@@ -59,7 +59,7 @@ async def push_metrics(body: str = Body(..., media_type="text/plain")):
 @router.get("/proxies/online", response_class=PlainTextResponse)
 async def get_online_proxies():    
     wl_is_active = await get_wl_is_active()
-    proxy_lines: list[str] = get_seen_online_proxies('1 hour')
+    proxy_lines: list[str] = get_seen_online_proxies('1.5 hour')
 
     sub = f"#profile-title: VPNClub | WL: {'ON' if wl_is_active else 'OFF'}\n" + \
           "#profile-locked: false\n" + \
