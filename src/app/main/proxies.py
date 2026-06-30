@@ -73,6 +73,8 @@ async def get_online_proxies():
         "#profile-locked: false\n" + \
         f"#announce: Обновлено: {last_updated.strftime('%Y-%m-%d %H:%M')}, оператoр: t2\n" + \
         "#profile-update-interval: 1\n" + \
+        "#subscriptions-sort-type: ping\n" + \
+        "#subscription-ping-onopen-enabled: 1\n" + \
         "#providerid: dibtA9xQ\n"
     print(f"{len(proxy_lines)} online proxies, {len(last_wl_online_proxies)} is saved, WL is {'active' if wl_is_active else 'inactive'}")
     sub += "\n" + "\n".join(last_wl_online_proxies)
